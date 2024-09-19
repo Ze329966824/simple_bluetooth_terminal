@@ -4,7 +4,10 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -66,10 +69,17 @@ public class DevicesFragment extends ListFragment {
             }
         };
 
-        // 请求权限
+        // 请求蓝牙扫描权限
         requestBluetoothPermissionLauncherForRefresh = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
-                granted -> BluetoothUtil.onPermissionsResult(this, granted, this::refresh));
+                granted -> {
+                    if (granted) {
+                        refresh();
+                    } else {
+                        Log.w(TAG, "Bluetooth permission denied.");
+                    }
+                }
+        );
     }
 
     @Override
@@ -127,28 +137,30 @@ public class DevicesFragment extends ListFragment {
 
         listItems.clear();  // 清空设备列表
         if (bluetoothAdapter != null) {
-            // 检查是否为 Android 12 (API 31) 或更高版本
+            // Android 12 (API 31) 及更高版本需要 BLUETOOTH_SCAN 权限
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                permissionMissing = getActivity().checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED;
+                permissionMissing = getActivity().checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED;
                 if (menu != null && menu.findItem(R.id.bt_refresh) != null)
                     menu.findItem(R.id.bt_refresh).setVisible(permissionMissing);
             } else {
-                permissionMissing = false;  // Android 12 以下版本不需要 BLUETOOTH_CONNECT 权限
+                permissionMissing = false;  // Android 12 以下不需要 BLUETOOTH_SCAN 权限，但仍需要位置权限
             }
 
             if (!permissionMissing) {
                 if (!bluetoothAdapter.isEnabled()) {
                     Log.w(TAG, "Bluetooth is disabled.");
                 } else {
-                    // 获取已配对的设备
+                    // 1. 获取已配对设备
                     for (BluetoothDevice device : bluetoothAdapter.getBondedDevices()) {
                         Log.d(TAG, "Found bonded device: " + device.getName() + " [" + device.getAddress() + "]");
-                        if (device.getType() != BluetoothDevice.DEVICE_TYPE_LE)
-                            listItems.add(device);
+                        listItems.add(device);
                     }
 
-                    // 按名称排序
-                    Collections.sort(listItems, BluetoothUtil::compareTo);
+                    // 2. 开始发现附近的设备
+                    if (bluetoothAdapter.isDiscovering()) {
+                        bluetoothAdapter.cancelDiscovery();  // 停止之前的扫描
+                    }
+                    bluetoothAdapter.startDiscovery();  // 开始新的设备扫描
                 }
             }
         }
@@ -159,11 +171,45 @@ public class DevicesFragment extends ListFragment {
             setEmptyText("<bluetooth is disabled>");
         } else if (permissionMissing) {
             setEmptyText("<permission missing, use REFRESH>");
-        } else {
+        } else if (listItems.isEmpty()) {
             setEmptyText("<no bluetooth devices found>");
         }
 
         listAdapter.notifyDataSetChanged();  // 更新列表
+    }
+
+    // 监听蓝牙设备发现广播
+    private final BroadcastReceiver receiver = new BroadcastReceiver() {
+        @SuppressLint("MissingPermission")
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                // 发现蓝牙设备
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                Log.d(TAG, "Discovered device: " + device.getName() + " [" + device.getAddress() + "]");
+                listItems.add(device);
+                listAdapter.notifyDataSetChanged();  // 更新列表
+            } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                Log.d(TAG, "Discovery finished.");
+            }
+        }
+    };
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        // 注册广播接收器，监听设备发现
+        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        getActivity().registerReceiver(receiver, filter);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        // 取消广播接收器注册
+        getActivity().unregisterReceiver(receiver);
     }
 
     @Override

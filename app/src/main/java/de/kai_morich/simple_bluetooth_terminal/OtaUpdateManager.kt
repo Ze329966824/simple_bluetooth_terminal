@@ -2,6 +2,10 @@ package de.kai_morich.simple_bluetooth_terminal
 
 import android.app.Application
 import android.content.Context
+import android.graphics.Color
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
 import android.widget.TextView
 import com.clj.fastble.BleManager
 import com.clj.fastble.data.BleDevice
@@ -40,7 +44,8 @@ object OtaUpdateManager {
         sendOtaCommand(bleDevice, otaStartCommand, receiveText)
     }
 
-     fun sendOtaCommand(bleDevice: BleDevice?, command: ByteArray, receiveText: TextView) {
+
+    fun sendOtaCommand(bleDevice: BleDevice?, command: ByteArray, receiveText: TextView) {
         BleManager.getInstance().write(
             bleDevice,
             uuid_service,
@@ -48,12 +53,30 @@ object OtaUpdateManager {
             command,
             object : BleWriteCallback() {
                 override fun onWriteSuccess(current: Int, total: Int, justWrite: ByteArray?) {
-                    receiveText.append("Command sent: ${justWrite?.joinToString(" ") { String.format("%02X", it) }}\n")
+                    val commandText = justWrite?.joinToString(" ") { String.format("%02X", it) } ?: ""
+                    val fullText = "Command sent: $commandText\n"
+
+                    // 创建一个 SpannableStringBuilder 来处理颜色
+                    val spannable = SpannableStringBuilder(fullText)
+
+                    // 设置 commandText 的颜色为黄色
+                    val start = fullText.indexOf(commandText)
+                    val end = start + commandText.length
+                    spannable.setSpan(
+                        ForegroundColorSpan(Color.YELLOW), // 设置黄色
+                        start,
+                        end,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+
+                    // 将 SpannableStringBuilder 添加到 TextView 中
+                    receiveText.append(spannable)
                 }
 
                 override fun onWriteFailure(exception: BleException?) {
                     receiveText.append("Write failed: ${exception?.description}\n")
                 }
-            })
+            }
+        )
     }
 }

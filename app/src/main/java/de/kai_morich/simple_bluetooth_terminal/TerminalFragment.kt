@@ -185,8 +185,27 @@ class TerminalFragment : Fragment() {
             }
 
             3 -> {
-                // Step 3: 发送 OTA_DATA 命令
-                sendOtaData()
+                // Step 3: 发送自定义 OTA 数据包
+                val otaDataCommand = byteArrayOf(
+                    0xAA.toByte(),   // SOF
+                    0x01.toByte(),   // Packet type
+                    0x05.toByte(),   // Data length (低字节)
+                    0x00.toByte(),   // Data length (高字节)
+                    0x68.toByte(),   // 'h'
+                    0x65.toByte(),   // 'e'
+                    0x6C.toByte(),   // 'l'
+                    0x6C.toByte(),   // 'l'
+                    0x6F.toByte(),   // 'o'
+                    0x00.toByte(),   // Padding
+                    0x00.toByte(),   // Padding
+                    0x00.toByte(),   // Padding
+                    0x00.toByte(),   // Padding
+                    0xBB.toByte()    // End byte
+                )
+
+                sendOtaCommand(connectedDevice, otaDataCommand, receiveText)
+                receiveText.append("Sent custom OTA data packet\n")
+
             }
 
             4 -> {

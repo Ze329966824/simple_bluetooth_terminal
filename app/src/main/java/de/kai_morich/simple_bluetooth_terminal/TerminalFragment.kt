@@ -31,6 +31,14 @@ class TerminalFragment : Fragment() {
     private var bleDevice: BleDevice? = null
     private var step = 0
 
+    override fun onResume() {
+        super.onResume()
+        // 从上一个Fragment获取传递过来的设备地址
+        val deviceAddress = arguments?.getString("device")
+
+        // 连接设备
+        connectDevice(deviceAddress)
+    }
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View? {
@@ -39,11 +47,7 @@ class TerminalFragment : Fragment() {
         receiveText.movementMethod = ScrollingMovementMethod()
         otaBtn = view.findViewById(R.id.ota_btn)
 
-        // 从上一个Fragment获取传递过来的设备地址
-        val deviceAddress = arguments?.getString("device")
 
-        // 连接设备
-        connectDevice(deviceAddress)
 
         // 设置OTA按钮的点击事件
         otaBtn.setOnClickListener {

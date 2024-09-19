@@ -65,6 +65,17 @@ class MainActivity : AppCompatActivity(), FragmentManager.OnBackStackChangedList
         }
         return true
     }
+    fun navigateToTerminalFragment(address: String) {
+        val fragment = TerminalFragment()
+        val args = Bundle()
+        args.putString("device_address", address)
+        fragment.arguments = args
+
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
+    }
 
 
     override fun onRequestPermissionsResult(

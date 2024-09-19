@@ -1,103 +1,60 @@
 package de.kai_morich.simple_bluetooth_terminal
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
-import android.view.*
-import android.widget.ArrayAdapter
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.AdapterView
 import android.widget.ListView
-import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
-import androidx.fragment.app.ListFragment
+import androidx.fragment.app.Fragment
 import com.clj.fastble.BleManager
-import com.clj.fastble.data.BleDevice
 import com.clj.fastble.callback.BleScanCallback
-import com.clj.fastble.exception.BleException
+import com.clj.fastble.data.BleDevice
 
-class DevicesFragment : ListFragment() {
+class DevicesFragment : Fragment() {
 
-    private lateinit var listAdapter: ArrayAdapter<BleDevice>
-    private val listItems = mutableListOf<BleDevice>()
+    private lateinit var listView: ListView
+    private var devicesList: MutableList<BleDevice> = mutableListOf()
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true)
-
-        listAdapter = object : ArrayAdapter<BleDevice>(requireContext(), 0, listItems) {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val device = getItem(position)
-                val view = convertView ?: layoutInflater.inflate(R.layout.device_list_item, parent, false)
-                val text1 = view.findViewById<TextView>(R.id.text1)
-                val text2 = view.findViewById<TextView>(R.id.text2)
-
-                text1.text = device?.name ?: "Unknown Device"
-                text2.text = device?.mac
-
-                return view
-            }
-        }
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View? {
+        val view = inflater.inflate(R.layout.fragment_devices, container, false)
+        listView = view.findViewById(R.id.listView)
 
         startScan()
 
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.menu_devices, menu)
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.bt_refresh -> {
-                startScan()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+        listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
+            val selectedDevice = devicesList[position]
+            val fragment = TerminalFragment()
+            val args = Bundle()
+            args.putString("device", selectedDevice.mac) // 将设备地址传递到 TerminalFragment
+            fragment.arguments = args
+            requireActivity().supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit()
         }
-    }
 
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
-        setListAdapter(listAdapter)
-    }
-
-    override fun onListItemClick(l: ListView, v: View, position: Int, id: Long) {
-        val device = listItems[position]
-        val args = Bundle().apply {
-            putString("device_address", device.mac)
-        }
-        val terminalFragment = TerminalFragment()
-        terminalFragment.arguments = args
-        parentFragmentManager.beginTransaction()
-            .replace(R.id.fragment, terminalFragment)
-            .addToBackStack(null)
-            .commit()
+        return view
     }
 
     private fun startScan() {
-        listItems.clear()
-        listAdapter.notifyDataSetChanged()
-
         BleManager.getInstance().scan(object : BleScanCallback() {
-            override fun onScanStarted(success: Boolean) {
-                Log.d("BleScan", "Scan started: $success")
+            override fun onScanFinished(scanResultList: List<BleDevice>) {
+                devicesList.clear()
+                devicesList.addAll(scanResultList)
+                // 更新列表适配器
             }
 
+            override fun onScanStarted(success: Boolean) {
 
-            override fun onScanFinished(scanResultList: List<BleDevice>) {
-                Log.d("BleScan", "Scan finished")
+
             }
 
             override fun onScanning(bleDevice: BleDevice?) {
-                bleDevice?.let {
-                    if (!listItems.contains(it)) {
-                        listItems.add(it)
-                        listAdapter.notifyDataSetChanged()
-                    }
-                }
+                // 更新 UI 显示扫描中的设备
             }
-
         })
     }
 }

@@ -109,26 +109,35 @@ public class DevicesFragment extends ListFragment {
     void refresh() {
         listItems.clear();
         if(bluetoothAdapter != null) {
+            // 检查设备是否为Android 12 (API 31)及以上版本
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Android 12及以上版本需要检查BLUETOOTH_CONNECT权限
                 permissionMissing = getActivity().checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED;
                 if(menu != null && menu.findItem(R.id.bt_refresh) != null)
                     menu.findItem(R.id.bt_refresh).setVisible(permissionMissing);
+            } else {
+                // Android 12以下版本，不需要BLUETOOTH_CONNECT权限
+                permissionMissing = false;  // 在这些版本上，权限是自动授予的
             }
-            if(!permissionMissing) {
-                for (BluetoothDevice device : bluetoothAdapter.getBondedDevices())
+
+            if (!permissionMissing) {
+                for (BluetoothDevice device : bluetoothAdapter.getBondedDevices()) {
                     if (device.getType() != BluetoothDevice.DEVICE_TYPE_LE)
                         listItems.add(device);
+                }
                 Collections.sort(listItems, BluetoothUtil::compareTo);
             }
         }
-        if(bluetoothAdapter == null)
+
+        if (bluetoothAdapter == null)
             setEmptyText("<bluetooth not supported>");
-        else if(!bluetoothAdapter.isEnabled())
+        else if (!bluetoothAdapter.isEnabled())
             setEmptyText("<bluetooth is disabled>");
-        else if(permissionMissing)
+        else if (permissionMissing)
             setEmptyText("<permission missing, use REFRESH>");
         else
             setEmptyText("<no bluetooth devices found>");
+
         listAdapter.notifyDataSetChanged();
     }
 

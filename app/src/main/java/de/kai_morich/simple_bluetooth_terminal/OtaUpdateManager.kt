@@ -1,78 +1,59 @@
-package de.kai_morich.simple_bluetooth_terminal
+import android.app.Application
+import android.content.Context
+import android.widget.TextView
+import com.clj.fastble.BleManager
+import com.clj.fastble.callback.BleWriteCallback
+import com.clj.fastble.data.BleDevice
+import com.clj.fastble.exception.BleException
+import com.clj.fastble.scan.BleScanRuleConfig
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import android.util.Log
+object OtaUpdateManager {
+    val TAG = "PduBleManager"
+    var uuid_service: String? = "0000ffe0-0000-1000-8000-00805f9b34fb"
+    var uuid_notify: String? = "0000ffe1-0000-1000-8000-00805f9b34fb"
 
-class OtaUpdateManager(private val sendCallback: (ByteArray) -> Unit) {
+    fun init(context: Context) {
+        // 使用 ApplicationContext 代替传入的 context 以防止内存泄漏
+        val appContext = context.applicationContext
+        BleManager.getInstance().init(appContext as Application)
+        BleManager.getInstance()
+            .enableLog(true)
+            .setReConnectCount(1, 5000)
+            .setSplitWriteNum(20)
+            .setConnectOverTime(10000)
+            .setOperateTimeout(5000)
 
-    private val TAG = "PduBleManager"
-    private var step = 0
+        val scanRuleConfig = BleScanRuleConfig.Builder()
+            .setScanTimeOut(5000)
+            .build()
+        BleManager.getInstance().initScanRule(scanRuleConfig)
+    }
 
-    // 各步骤需要发送的数据
-    private val otaUpdate = byteArrayOf(0x55.toByte(), 0x36.toByte(), 0xAA.toByte())
-    private val otaStart = byteArrayOf(0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
-    private val otaHeader = byteArrayOf(0xAA.toByte(), 0x02.toByte(), 0x10.toByte(), 0x00.toByte(), 0x7C.toByte(), 0x42.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xF0.toByte(), 0xCA.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x07.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
-    private val otaEnd = byteArrayOf(0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
-
-    fun onReceiveAck(response: ByteArray) {
-        val ack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
-        if (response.contentEquals(ack)) {
-            step += 1
-            sendNextCommand()
-        } else if (response.contains(0x57.toByte())) {
-            step = 1
-            sendNextCommand()
+    fun startOtaProcess(bleDevice: BleDevice?, receiveText: TextView) {
+        if (bleDevice == null) {
+            receiveText.append("No device connected\n")
+            return
         }
+
+        // 发送 OTA 开始命令
+        val otaStartCommand = byteArrayOf(0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0xBB.toByte())
+        sendOtaCommand(bleDevice, otaStartCommand, receiveText)
     }
 
-    fun sendNextCommand() {
-        when (step) {
-            0 -> sendCommand(otaUpdate)
-            1 -> sendCommand(otaStart)
-            2 -> sendCommand(otaHeader)
-            3 -> sendOtaData()
-            4 -> sendCommand(otaEnd)
-        }
-    }
+    private fun sendOtaCommand(bleDevice: BleDevice, command: ByteArray, receiveText: TextView) {
+        BleManager.getInstance().write(
+            bleDevice,
+            uuid_service, // UUID for Service
+            uuid_notify, // UUID for Characteristic
+            command,
+            object : BleWriteCallback() {
+                override fun onWriteSuccess(current: Int, total: Int, justWrite: ByteArray?) {
+                    receiveText.append("Command sent: ${justWrite?.joinToString(" ") { String.format("%02X", it) }}\n")
+                }
 
-    private fun sendCommand(command: ByteArray) {
-        Log.d(TAG, "发送指令: ${command.joinToString(" ") { String.format("%02X", it) }}")
-        sendCallback(command) // 使用回调函数发送数据
-    }
-
-    private fun sendOtaData() {
-        val data = "68656c6c6f".decodeHex() // 模拟的文件数据
-        val dataLen: Short = data.size.toShort()
-        val dataLenBytes = ByteBuffer.allocate(2)
-            .order(ByteOrder.LITTLE_ENDIAN)
-            .putShort(dataLen)
-            .array()
-
-        val packet = ByteArray(1 + 1 + 2 + data.size + 4 + 1)
-        var offset = 0
-        packet[offset++] = 0xAA.toByte()
-        packet[offset++] = 0x01.toByte()
-        packet[offset++] = dataLenBytes[0]
-        packet[offset++] = dataLenBytes[1]
-
-        System.arraycopy(data, 0, packet, offset, data.size)
-        offset += data.size
-        packet[offset++] = 0x00.toByte()
-        packet[offset++] = 0x00.toByte()
-        packet[offset++] = 0x00.toByte()
-        packet[offset++] = 0x00.toByte()
-        packet[offset] = 0xBB.toByte()
-
-        sendCommand(packet)
-    }
-
-    private fun String.decodeHex(): ByteArray {
-        val len = this.length
-        val data = ByteArray(len / 2)
-        for (i in 0 until len step 2) {
-            data[i / 2] = ((this[i].toString().toInt(16) shl 4) + this[i + 1].toString().toInt(16)).toByte()
-        }
-        return data
+                override fun onWriteFailure(exception: BleException?) {
+                    receiveText.append("Write failed: ${exception?.description}\n")
+                }
+            })
     }
 }

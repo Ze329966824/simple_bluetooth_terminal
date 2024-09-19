@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -35,12 +36,19 @@ public class DevicesFragment extends ListFragment {
     private Menu menu;
     private boolean permissionMissing;
 
+    private static final String TAG = "PduBleManager";  // 用于日志调试
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-        if(getActivity().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH))
+
+        // 检查设备是否支持蓝牙功能
+        if (getActivity().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)) {
             bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        }
+
+        // 初始化适配器
         listAdapter = new ArrayAdapter<BluetoothDevice>(getActivity(), 0, listItems) {
             @NonNull
             @Override
@@ -50,12 +58,15 @@ public class DevicesFragment extends ListFragment {
                     view = getActivity().getLayoutInflater().inflate(R.layout.device_list_item, parent, false);
                 TextView text1 = view.findViewById(R.id.text1);
                 TextView text2 = view.findViewById(R.id.text2);
+
                 @SuppressLint("MissingPermission") String deviceName = device.getName();
                 text1.setText(deviceName);
                 text2.setText(device.getAddress());
                 return view;
             }
         };
+
+        // 请求权限
         requestBluetoothPermissionLauncherForRefresh = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 granted -> BluetoothUtil.onPermissionsResult(this, granted, this::refresh));
@@ -65,10 +76,13 @@ public class DevicesFragment extends ListFragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         setListAdapter(null);
+
+        // 设置列表头部
         View header = getActivity().getLayoutInflater().inflate(R.layout.device_list_header, null, false);
         getListView().addHeaderView(header, null, false);
         setEmptyText("initializing...");
         ((TextView) getListView().getEmptyView()).setTextSize(18);
+
         setListAdapter(listAdapter);
     }
 
@@ -76,16 +90,18 @@ public class DevicesFragment extends ListFragment {
     public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         this.menu = menu;
         inflater.inflate(R.menu.menu_devices, menu);
-        if(permissionMissing)
+
+        if (permissionMissing)
             menu.findItem(R.id.bt_refresh).setVisible(true);
-        if(bluetoothAdapter == null)
+
+        if (bluetoothAdapter == null)
             menu.findItem(R.id.bt_settings).setEnabled(false);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        refresh();
+        refresh();  // 在 onResume 中刷新设备列表
     }
 
     @Override
@@ -97,7 +113,7 @@ public class DevicesFragment extends ListFragment {
             startActivity(intent);
             return true;
         } else if (id == R.id.bt_refresh) {
-            if(BluetoothUtil.hasPermissions(this, requestBluetoothPermissionLauncherForRefresh))
+            if (BluetoothUtil.hasPermissions(this, requestBluetoothPermissionLauncherForRefresh))
                 refresh();
             return true;
         } else {
@@ -107,43 +123,52 @@ public class DevicesFragment extends ListFragment {
 
     @SuppressLint("MissingPermission")
     void refresh() {
-        listItems.clear();
-        if(bluetoothAdapter != null) {
-            // 检查设备是否为Android 12 (API 31)及以上版本
+        Log.d(TAG, "Refreshing Bluetooth device list...");
+
+        listItems.clear();  // 清空设备列表
+        if (bluetoothAdapter != null) {
+            // 检查是否为 Android 12 (API 31) 或更高版本
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // Android 12及以上版本需要检查BLUETOOTH_CONNECT权限
                 permissionMissing = getActivity().checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED;
-                if(menu != null && menu.findItem(R.id.bt_refresh) != null)
+                if (menu != null && menu.findItem(R.id.bt_refresh) != null)
                     menu.findItem(R.id.bt_refresh).setVisible(permissionMissing);
             } else {
-                // Android 12以下版本，不需要BLUETOOTH_CONNECT权限
-                permissionMissing = false;  // 在这些版本上，权限是自动授予的
+                permissionMissing = false;  // Android 12 以下版本不需要 BLUETOOTH_CONNECT 权限
             }
 
             if (!permissionMissing) {
-                for (BluetoothDevice device : bluetoothAdapter.getBondedDevices()) {
-                    if (device.getType() != BluetoothDevice.DEVICE_TYPE_LE)
-                        listItems.add(device);
+                if (!bluetoothAdapter.isEnabled()) {
+                    Log.w(TAG, "Bluetooth is disabled.");
+                } else {
+                    // 获取已配对的设备
+                    for (BluetoothDevice device : bluetoothAdapter.getBondedDevices()) {
+                        Log.d(TAG, "Found bonded device: " + device.getName() + " [" + device.getAddress() + "]");
+                        if (device.getType() != BluetoothDevice.DEVICE_TYPE_LE)
+                            listItems.add(device);
+                    }
+
+                    // 按名称排序
+                    Collections.sort(listItems, BluetoothUtil::compareTo);
                 }
-                Collections.sort(listItems, BluetoothUtil::compareTo);
             }
         }
 
-        if (bluetoothAdapter == null)
+        if (bluetoothAdapter == null) {
             setEmptyText("<bluetooth not supported>");
-        else if (!bluetoothAdapter.isEnabled())
+        } else if (!bluetoothAdapter.isEnabled()) {
             setEmptyText("<bluetooth is disabled>");
-        else if (permissionMissing)
+        } else if (permissionMissing) {
             setEmptyText("<permission missing, use REFRESH>");
-        else
+        } else {
             setEmptyText("<no bluetooth devices found>");
+        }
 
-        listAdapter.notifyDataSetChanged();
+        listAdapter.notifyDataSetChanged();  // 更新列表
     }
 
     @Override
     public void onListItemClick(@NonNull ListView l, @NonNull View v, int position, long id) {
-        BluetoothDevice device = listItems.get(position-1);
+        BluetoothDevice device = listItems.get(position - 1);  // 获取点击的设备
         Bundle args = new Bundle();
         args.putString("device", device.getAddress());
         Fragment fragment = new TerminalFragment();

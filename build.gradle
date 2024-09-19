@@ -1,10 +1,14 @@
 buildscript {
+    ext.kotlin_version = "1.8.10" // Kotlin 版本，你可以根据最新版本调整
     repositories {
         google()
         mavenCentral()
+        maven { url "https://repo1.maven.org/maven2/" }
+        maven { url "https://jitpack.io" }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.2.1'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version" // Kotlin 插件
     }
 }
 
@@ -12,6 +16,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url "https://repo1.maven.org/maven2/" }
+        maven { url "https://jitpack.io" }
     }
 }
 

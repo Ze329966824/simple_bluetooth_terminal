@@ -1,30 +1,47 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
 
 android {
     compileSdk 34
+
     defaultConfig {
         targetSdk 34
         minSdk 18
         vectorDrawables.useSupportLibrary true
-
+        multiDexEnabled true
         applicationId "de.kai_morich.simple_bluetooth_terminal"
         versionCode 1
         versionName "1.0"
     }
+
+    // 确保 Java 编译器的目标版本一致
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
+
+    // 确保 Kotlin 编译器的目标版本一致
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
     namespace 'de.kai_morich.simple_bluetooth_terminal'
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
+    implementation 'com.blankj:utilcodex:1.31.1'
+    implementation 'com.github.Jasonchenlijian:FastBle:2.4.0'
+
+    // Kotlin 标准库依赖
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.10"
 }

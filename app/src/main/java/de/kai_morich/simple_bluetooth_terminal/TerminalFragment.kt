@@ -34,7 +34,7 @@ class TerminalFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         // 从上一个Fragment获取传递过来的设备地址
-        val deviceAddress = arguments?.getString("device")
+        val deviceAddress = arguments?.getString("device_address")
 
         // 连接设备
         connectDevice(deviceAddress)
@@ -129,23 +129,30 @@ class TerminalFragment : Fragment() {
 
     // 发送消息并显示为浅蓝色
     private fun sendMessage(command: ByteArray) {
-        val messageToSend = byteArrayToHex(command)
-        val spn = SpannableStringBuilder(messageToSend)
-        spn.setSpan(
-            ForegroundColorSpan(Color.parseColor("#ADD8E6")), 0, spn.length,
-            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE // 浅蓝色
-        )
-        receiveText.append(spn)
-        receiveText.append("\n")
+//        val messageToSend = byteArrayToHex(command)
+//        val spn = SpannableStringBuilder(messageToSend)
+//        spn.setSpan(
+//            ForegroundColorSpan(Color.parseColor("#ADD8E6")), 0, spn.length,
+//            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE // 浅蓝色
+//        )
+//        receiveText.append(spn)
+//        receiveText.append("\n")
 
         // 发送指令到设备
         BleManager.getInstance().write(bleDevice, OtaUpdateManager.uuid_service, OtaUpdateManager.uuid_notify,
             command, object : BleWriteCallback() {
                 override fun onWriteSuccess(current: Int, total: Int, justWrite: ByteArray?) {
-                    receiveText.append("Write Success: ${byteArrayToHex(justWrite!!)}\n")
+                    val spn = SpannableStringBuilder(byteArrayToHex(justWrite!!))
+                    spn.setSpan(
+                        ForegroundColorSpan(Color.YELLOW), 0, spn.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+
+                    receiveText.append("Write Success: ${spn}\n")
                 }
 
                 override fun onWriteFailure(exception: BleException?) {
+
                     receiveText.append("Write failed: ${exception?.description}\n")
                 }
             })

@@ -40,7 +40,7 @@ object OtaUpdateManager {
         sendOtaCommand(bleDevice, otaStartCommand, receiveText)
     }
 
-    private fun sendOtaCommand(bleDevice: BleDevice, command: ByteArray, receiveText: TextView) {
+     fun sendOtaCommand(bleDevice: BleDevice?, command: ByteArray, receiveText: TextView) {
         BleManager.getInstance().write(
             bleDevice,
             uuid_service,

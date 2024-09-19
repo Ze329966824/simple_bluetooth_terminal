@@ -21,6 +21,7 @@ import com.clj.fastble.exception.BleException
 import com.clj.fastble.callback.BleGattCallback
 import com.clj.fastble.callback.BleNotifyCallback
 import com.clj.fastble.callback.BleWriteCallback
+import de.kai_morich.simple_bluetooth_terminal.OtaUpdateManager.sendOtaCommand
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -57,6 +58,7 @@ class TerminalFragment : Fragment() {
         return view
     }
 
+     var connectedDevice:BleDevice?=null
     // 连接设备
     private fun connectDevice(address: String?) {
         if (address.isNullOrEmpty()) {
@@ -74,6 +76,7 @@ class TerminalFragment : Fragment() {
             }
 
             override fun onConnectSuccess(bleDevice: BleDevice?, gatt: BluetoothGatt?, status: Int) {
+                connectedDevice = bleDevice
                 receiveText.append("Connected to device\n")
                 this@TerminalFragment.bleDevice = bleDevice
                 setNotification() // 设置通知
@@ -158,55 +161,106 @@ class TerminalFragment : Fragment() {
             })
     }
 
-    // 启动OTA流程
     private fun startOtaProcess() {
         when (step) {
             0 -> {
+                // Step 0: 发送 OTA_UPDATE 命令
                 val otaUpdateCommand = byteArrayOf(0x55.toByte(), 0x36.toByte(), 0xAA.toByte())
-                sendMessage(otaUpdateCommand)
-                step++
+                sendOtaCommand(connectedDevice, otaUpdateCommand, receiveText)
+                receiveText.append("Sent OTA_UPDATE command\n")
             }
+
             1 -> {
-                val otaStartCommand = byteArrayOf(
-                    0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(),
-                    0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-                    0x00.toByte(), 0xBB.toByte()
-                )
-                sendMessage(otaStartCommand)
-                step++
+                // Step 1: 发送 OTA_START 命令
+                val otaStartCommand = byteArrayOf(0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                sendOtaCommand(connectedDevice, otaStartCommand, receiveText)
+                receiveText.append("Sent OTA_START command\n")
             }
+
             2 -> {
-                val otaHeaderCommand = byteArrayOf(
-                    0xAA.toByte(), 0x02.toByte(), 0x10.toByte(), 0x00.toByte(),
-                    0x7C.toByte(), 0x42.toByte(), 0x00.toByte(), 0x00.toByte(),
-                    0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-                    0xF0.toByte(), 0xCA.toByte(), 0xFF.toByte(), 0xFF.toByte(),
-                    0x07.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-                    0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte()
-                )
-                sendMessage(otaHeaderCommand)
-                step++
+                // Step 2: 发送 OTA_HEADER 命令
+                val otaHeaderCommand = byteArrayOf(0xAA.toByte(), 0x02.toByte(), 0x10.toByte(), 0x00.toByte(), 0x7C.toByte(), 0x42.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xF0.toByte(), 0xCA.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x07.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                sendOtaCommand(connectedDevice, otaHeaderCommand, receiveText)
+                receiveText.append("Sent OTA_HEADER command\n")
             }
-            3 -> sendOtaData()
+
+            3 -> {
+                // Step 3: 发送 OTA_DATA 命令
+                sendOtaData()
+            }
+
             4 -> {
-                val otaEndCommand = byteArrayOf(
-                    0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(),
-                    0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-                    0x00.toByte(), 0xBB.toByte()
-                )
-                sendMessage(otaEndCommand)
+                // Step 4: 发送 OTA_END 命令
+                val otaEndCommand = byteArrayOf(0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                sendOtaCommand(connectedDevice, otaEndCommand, receiveText)
+                receiveText.append("Sent OTA_END command\n")
             }
         }
     }
 
     // 处理OTA流程响应，决定是否进入下一步
     private fun processOtaResponse(data: ByteArray) {
-        val ack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
-        if (data.contentEquals(ack)) {
-            step++
-            startOtaProcess()
+        when (step) {
+            0 -> { // Step 0: 处理 OTA_UPDATE 的响应
+                val expectedResponse = byteArrayOf(0xFF.toByte(), 0xAA.toByte(), 0x57.toByte(), 0xFF.toByte(), 0xBB.toByte())
+                if (data.contentEquals(expectedResponse)) {
+                    // 收到 FF AA 57 FF BB 的数据，进入下一步
+                    receiveText.append("Received OTA_UPDATE response, proceeding to OTA_START\n")
+                    step++ // 进入下一步
+                    startOtaProcess() // 执行下一步 OTA 操作
+                } else {
+                    receiveText.append("Unexpected response for OTA_UPDATE\n")
+                }
+            }
+
+            1 -> { // Step 1: 处理 OTA_START 的 ACK
+                val ack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                if (data.contentEquals(ack)) {
+                    receiveText.append("Received OTA_START ACK, proceeding to OTA_HEADER\n")
+                    step++ // 进入下一步
+                    startOtaProcess() // 执行下一步 OTA 操作
+                } else {
+                    receiveText.append("Unexpected response for OTA_START\n")
+                }
+            }
+
+            2 -> { // Step 2: 处理 OTA_HEADER 的 ACK
+                val ack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                if (data.contentEquals(ack)) {
+                    receiveText.append("Received OTA_HEADER ACK, proceeding to OTA_DATA\n")
+                    step++ // 进入下一步
+                    startOtaProcess() // 执行下一步 OTA 操作
+                } else {
+                    receiveText.append("Unexpected response for OTA_HEADER\n")
+                }
+            }
+
+            3 -> { // Step 3: 处理 OTA_DATA 的 ACK
+                val ack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                if (data.contentEquals(ack)) {
+                    receiveText.append("Received OTA_DATA ACK, proceeding to OTA_END\n")
+                    step++ // 进入最后一步
+                    startOtaProcess() // 执行下一步 OTA 操作
+                } else {
+                    receiveText.append("Unexpected response for OTA_DATA\n")
+                }
+            }
+
+            4 -> { // Step 4: 处理 OTA_END 的 ACK（最后一步）
+                val ack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                if (data.contentEquals(ack)) {
+                    receiveText.append("OTA process completed successfully!\n")
+                } else {
+                    receiveText.append("Unexpected response for OTA_END\n")
+                }
+            }
+
+            else -> {
+                receiveText.append("Unknown step in OTA process\n")
+            }
         }
     }
+
 
     // 发送OTA数据包
     private fun sendOtaData() {

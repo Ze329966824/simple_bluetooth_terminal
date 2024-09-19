@@ -9,6 +9,7 @@ import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.method.ScrollingMovementMethod
 import android.text.style.ForegroundColorSpan
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,6 +24,7 @@ import com.clj.fastble.callback.BleGattCallback
 import com.clj.fastble.callback.BleMtuChangedCallback
 import com.clj.fastble.callback.BleNotifyCallback
 import com.clj.fastble.callback.BleWriteCallback
+import de.kai_morich.simple_bluetooth_terminal.OtaUpdateManager.TAG
 import de.kai_morich.simple_bluetooth_terminal.OtaUpdateManager.sendOtaCommand
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -42,6 +44,7 @@ class TerminalFragment : Fragment() {
         // 连接设备
         connectDevice(deviceAddress)
     }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View? {
@@ -49,7 +52,6 @@ class TerminalFragment : Fragment() {
         receiveText = view.findViewById(R.id.receive_text)
         receiveText.movementMethod = ScrollingMovementMethod()
         otaBtn = view.findViewById(R.id.ota_btn)
-
 
 
         // 设置OTA按钮的点击事件
@@ -76,7 +78,11 @@ class TerminalFragment : Fragment() {
                 receiveText.append("Connect failed: ${exception?.description}\n")
             }
 
-            override fun onConnectSuccess(bleDevice: BleDevice?, gatt: BluetoothGatt?, status: Int) {
+            override fun onConnectSuccess(
+                bleDevice: BleDevice?,
+                gatt: BluetoothGatt?,
+                status: Int
+            ) {
                 receiveText.append("Connected to device\n")
                 this@TerminalFragment.bleDevice = bleDevice
                 setNotification() // 设置通知
@@ -104,21 +110,18 @@ class TerminalFragment : Fragment() {
                 BleManager.getInstance()
                     .setMtu(bleDevice, currentMTU, object : BleMtuChangedCallback() {
                         override fun onSetMTUFailure(exception: BleException) {
-//                            Log.i(
-//                                TAG,
-//                                "onSetMTUFailure for MTU: $currentMTU\n${exception.description}"
-//                            )
+                            Log.i(TAG, "onSetMTUFailure for MTU: $currentMTU\n${exception.description}")
                             if (currentMTU > 23) {
-//                                Log.i(TAG, "Max MTU supported: ${currentMTU - 1}")
+                                Log.i(TAG, "Max MTU supported: ${currentMTU - 1}")
                             }
                         }
 
                         override fun onMtuChanged(mtu: Int) {
-//                            Log.i(TAG, "set: $currentMTU   onMtuChanged: $mtu")
+                            Log.i(TAG, "set: $currentMTU   onMtuChanged: $mtu")
                             if (mtu < maxMTU && mtu != defaultMTU) {
                                 trySetMTU(mtu + 1)
                             } else {
-//                                Log.i(TAG, "Max MTU supported: $mtu")
+                                Log.i(TAG, "Max MTU supported: $mtu")
                             }
                         }
                     })
@@ -126,7 +129,7 @@ class TerminalFragment : Fragment() {
 
             trySetMTU(defaultMTU + 1)
         } else {
-//            Log.i(TAG, "MTU setting is not required for devices below API 21.")
+            Log.i(TAG, "MTU setting is not required for devices below API 21.")
         }
     }
 
@@ -179,26 +182,29 @@ class TerminalFragment : Fragment() {
 //        receiveText.append("\n")
 
         // 发送指令到设备
-        BleManager.getInstance().write(bleDevice, OtaUpdateManager.uuid_service, OtaUpdateManager.uuid_notify,
-            command, object : BleWriteCallback() {
-                override fun onWriteSuccess(current: Int, total: Int, justWrite: ByteArray?) {
-                    val spn = SpannableStringBuilder(byteArrayToHex(justWrite!!))
-                    spn.setSpan(
-                        ForegroundColorSpan(Color.YELLOW), 0, spn.length,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
+        BleManager.getInstance()
+            .write(bleDevice, OtaUpdateManager.uuid_service, OtaUpdateManager.uuid_notify,
+                command, object : BleWriteCallback() {
+                    override fun onWriteSuccess(current: Int, total: Int, justWrite: ByteArray?) {
+                        val spn = SpannableStringBuilder(byteArrayToHex(justWrite!!))
+                        spn.setSpan(
+                            ForegroundColorSpan(Color.YELLOW), 0, spn.length,
+                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
 
-                    receiveText.append("Write Success: ${spn}\n")
-                }
+                        receiveText.append("Write Success: ${spn}\n")
+                    }
 
-                override fun onWriteFailure(exception: BleException?) {
+                    override fun onWriteFailure(exception: BleException?) {
 
-                    receiveText.append("Write failed: ${exception?.description}\n")
-                }
-            })
+                        receiveText.append("Write failed: ${exception?.description}\n")
+                    }
+                })
     }
 
     private fun startOtaProcess() {
+        receiveText.append("\n")
+
         when (step) {
             0 -> {
                 // Step 0: 发送 OTA_UPDATE 命令
@@ -209,14 +215,50 @@ class TerminalFragment : Fragment() {
 
             1 -> {
                 // Step 1: 发送 OTA_START 命令
-                val otaStartCommand = byteArrayOf(0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                val otaStartCommand = byteArrayOf(
+                    0xAA.toByte(),
+                    0x00.toByte(),
+                    0x01.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0xBB.toByte()
+                )
                 sendOtaCommand(bleDevice, otaStartCommand, receiveText)
                 receiveText.append("Sent OTA_START command\n")
             }
 
             2 -> {
                 // Step 2: 发送 OTA_HEADER 命令
-                val otaHeaderCommand = byteArrayOf(0xAA.toByte(), 0x02.toByte(), 0x10.toByte(), 0x00.toByte(), 0x7C.toByte(), 0x42.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xF0.toByte(), 0xCA.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x07.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                val otaHeaderCommand = byteArrayOf(
+                    0xAA.toByte(),
+                    0x02.toByte(),
+                    0x10.toByte(),
+                    0x00.toByte(),
+                    0x7C.toByte(),
+                    0x42.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0xF0.toByte(),
+                    0xCA.toByte(),
+                    0xFF.toByte(),
+                    0xFF.toByte(),
+                    0x07.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0xBB.toByte()
+                )
                 sendOtaCommand(bleDevice, otaHeaderCommand, receiveText)
                 receiveText.append("Sent OTA_HEADER command\n")
             }
@@ -247,23 +289,62 @@ class TerminalFragment : Fragment() {
 
             4 -> {
                 // Step 4: 发送 OTA_END 命令
-                val otaEndCommand = byteArrayOf(0xAA.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                val otaEndCommand = byteArrayOf(
+                    0xAA.toByte(),
+                    0x00.toByte(),
+                    0x01.toByte(),
+                    0x00.toByte(),
+                    0x01.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0xBB.toByte()
+                )
                 sendOtaCommand(bleDevice, otaEndCommand, receiveText)
                 receiveText.append("Sent OTA_END command\n")
             }
         }
     }
-    val ack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
-    val nack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+
+    val ack = byteArrayOf(
+        0xAA.toByte(),
+        0x03.toByte(),
+        0x01.toByte(),
+        0x00.toByte(),
+        0x00.toByte(),
+        0x00.toByte(),
+        0x00.toByte(),
+        0x00.toByte(),
+        0x00.toByte(),
+        0xBB.toByte()
+    )
+    val nack = byteArrayOf(
+        0xAA.toByte(),
+        0x03.toByte(),
+        0x01.toByte(),
+        0x00.toByte(),
+        0x01.toByte(),
+        0x00.toByte(),
+        0x00.toByte(),
+        0x00.toByte(),
+        0x00.toByte(),
+        0xBB.toByte()
+    )
 
     // 处理OTA流程响应，决定是否进入下一步
     private fun processOtaResponse(data: ByteArray) {
         when (step) {
             0 -> { // Step 0: 处理 OTA_UPDATE 的响应
-                val expectedResponse = byteArrayOf(0xFF.toByte(), 0xAA.toByte(), 0x57.toByte(), 0xFF.toByte(), 0xBB.toByte())
+                val expectedResponse = byteArrayOf(
+                    0xFF.toByte(),
+                    0xAA.toByte(),
+                    0x57.toByte(),
+                    0xFF.toByte(),
+                    0xBB.toByte()
+                )
                 if (data.contentEquals(expectedResponse)) {
                     // 收到 FF AA 57 FF BB 的数据，进入下一步
-                    receiveText.append("Received OTA_UPDATE response, proceeding to OTA_START\n")
                     step++ // 进入下一步
                     startOtaProcess() // 执行下一步 OTA 操作
                 } else {
@@ -273,39 +354,46 @@ class TerminalFragment : Fragment() {
 
             1 -> { // Step 1: 处理 OTA_START 的 ACK
                 if (data.contentEquals(ack)) {
-                    receiveText.append("Received OTA_START ACK, proceeding to OTA_HEADER\n")
                     step++ // 进入下一步
                     startOtaProcess() // 执行下一步 OTA 操作
-                } else if (data.contentEquals(nack)){
+                } else if (data.contentEquals(nack)) {
                     receiveText.append("Received OTA_START NACK\n")
                 }
             }
 
             2 -> { // Step 2: 处理 OTA_HEADER 的 ACK
                 if (data.contentEquals(ack)) {
-                    receiveText.append("Received OTA_HEADER ACK, proceeding to OTA_DATA\n")
                     step++ // 进入下一步
                     startOtaProcess() // 执行下一步 OTA 操作
-                }  else if (data.contentEquals(nack)){
+                } else if (data.contentEquals(nack)) {
                     receiveText.append("Received OTA_HEADER NACK\n")
                 }
             }
 
             3 -> { // Step 3: 处理 OTA_DATA 的 ACK
                 if (data.contentEquals(ack)) {
-                    receiveText.append("Received OTA_DATA ACK, proceeding to OTA_END\n")
                     step++ // 进入最后一步
                     startOtaProcess() // 执行下一步 OTA 操作
-                } else if (data.contentEquals(nack)){
+                } else if (data.contentEquals(nack)) {
                     receiveText.append("Received OTA_DATA NACK\n")
                 }
             }
 
             4 -> { // Step 4: 处理 OTA_END 的 ACK（最后一步）
-                val ack = byteArrayOf(0xAA.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0xBB.toByte())
+                val ack = byteArrayOf(
+                    0xAA.toByte(),
+                    0x03.toByte(),
+                    0x01.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0x00.toByte(),
+                    0xBB.toByte()
+                )
                 if (data.contentEquals(ack)) {
-                    receiveText.append("Received OTA_END ACK\n")
-                }  else if (data.contentEquals(nack)){
+                } else if (data.contentEquals(nack)) {
                     receiveText.append("Received OTA_END NACK\n")
                 }
             }
@@ -315,7 +403,6 @@ class TerminalFragment : Fragment() {
             }
         }
 
-        receiveText.append("\n")
 
     }
 
@@ -353,7 +440,8 @@ class TerminalFragment : Fragment() {
         val len = this.length
         val data = ByteArray(len / 2)
         for (i in 0 until len step 2) {
-            data[i / 2] = ((this[i].toString().toInt(16) shl 4) + this[i + 1].toString().toInt(16)).toByte()
+            data[i / 2] =
+                ((this[i].toString().toInt(16) shl 4) + this[i + 1].toString().toInt(16)).toByte()
         }
         return data
     }

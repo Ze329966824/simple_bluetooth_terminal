@@ -54,7 +54,7 @@ object OtaUpdateManager {
             object : BleWriteCallback() {
                 override fun onWriteSuccess(current: Int, total: Int, justWrite: ByteArray?) {
                     val commandText = justWrite?.joinToString(" ") { String.format("%02X", it) } ?: ""
-                    val fullText = "Command sent: $commandText\n"
+                    val fullText = "$commandText\n"
 
                     // 创建一个 SpannableStringBuilder 来处理颜色
                     val spannable = SpannableStringBuilder(fullText)

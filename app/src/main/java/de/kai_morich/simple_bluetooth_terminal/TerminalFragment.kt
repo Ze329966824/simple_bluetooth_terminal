@@ -86,7 +86,7 @@ class TerminalFragment : Fragment() {
                 receiveText.append("Connected to device\n")
                 this@TerminalFragment.bleDevice = bleDevice
                 setNotification() // 设置通知
-                findMaxMTU()
+                setMaxMTU()
             }
 
             override fun onDisConnected(
@@ -100,6 +100,27 @@ class TerminalFragment : Fragment() {
         })
     }
 
+    private fun setMaxMTU() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val maxMTU = 512  // 直接尝试设置为最大值 512
+
+            BleManager.getInstance()
+                .setMtu(bleDevice, maxMTU, object : BleMtuChangedCallback() {
+                    override fun onSetMTUFailure(exception: BleException) {
+                        // 设置 MTU 失败，设备可能不支持 512，可以记录并处理
+                        Log.e(TAG, "Failed to set MTU to $maxMTU: ${exception.description}")
+                    }
+
+                    override fun onMtuChanged(mtu: Int) {
+                        // 设置 MTU 成功，记录当前设备实际支持的 MTU
+                        Log.i(TAG, "MTU successfully set to $mtu")
+                    }
+                })
+        } else {
+            // 如果设备的 API 低于 21，不支持 MTU 调整
+            Log.i(TAG, "MTU setting is not supported on devices below API 21.")
+        }
+    }
 
     private fun findMaxMTU() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

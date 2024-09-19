@@ -86,7 +86,7 @@ class TerminalFragment : Fragment() {
                 receiveText.append("Connected to device\n")
                 this@TerminalFragment.bleDevice = bleDevice
                 setNotification() // 设置通知
-                setMaxMTU()
+                findMaxMTU()
             }
 
             override fun onDisConnected(
@@ -121,36 +121,37 @@ class TerminalFragment : Fragment() {
             Log.i(TAG, "MTU setting is not supported on devices below API 21.")
         }
     }
-
     private fun findMaxMTU() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            var defaultMTU = 23
-            val maxMTU = 512
+            // 初始设置默认MTU值
+            val defaultMTU = 23
+            val maxPossibleMTU = 512 // 你期望的最大MTU值或系统允许的最大MTU值
+            var currentMTU = defaultMTU
 
             fun trySetMTU(currentMTU: Int) {
-                BleManager.getInstance()
-                    .setMtu(bleDevice, currentMTU, object : BleMtuChangedCallback() {
-                        override fun onSetMTUFailure(exception: BleException) {
-                            Log.i(TAG, "onSetMTUFailure for MTU: $currentMTU\n${exception.description}")
-                            if (currentMTU > 23) {
-                                Log.i(TAG, "Max MTU supported: ${currentMTU - 1}")
-                            }
+                BleManager.getInstance().setMtu(bleDevice, currentMTU, object : BleMtuChangedCallback() {
+                    override fun onMtuChanged(mtu: Int) {
+                        Log.d(TAG, "MTU set to: $mtu")
+                        if (mtu < maxPossibleMTU && mtu != currentMTU) {
+                            // 如果MTU没有达到最大值，继续增加MTU值
+                            trySetMTU(mtu + 1)
+                        } else {
+                            Log.d(TAG, "Max MTU supported: $mtu")
                         }
+                    }
 
-                        override fun onMtuChanged(mtu: Int) {
-                            Log.i(TAG, "set: $currentMTU   onMtuChanged: $mtu")
-                            if (mtu < maxMTU && mtu != defaultMTU) {
-                                trySetMTU(mtu + 1)
-                            } else {
-                                Log.i(TAG, "Max MTU supported: $mtu")
-                            }
+                    override fun onSetMTUFailure(exception: BleException) {
+                        Log.e(TAG, "Failed to set MTU to: $currentMTU, reason: ${exception.description}")
+                        if (currentMTU > 23) {
+                            Log.d(TAG, "Max MTU supported: ${currentMTU - 1}")
                         }
-                    })
+                    }
+                })
             }
 
-            trySetMTU(defaultMTU + 1)
+            trySetMTU(currentMTU + 1)  // 开始尝试设置比默认值更大的MTU
         } else {
-            Log.i(TAG, "MTU setting is not required for devices below API 21.")
+            Log.d(TAG, "MTU setting is not required for devices below API 21.")
         }
     }
 

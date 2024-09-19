@@ -1,10 +1,12 @@
+package de.kai_morich.simple_bluetooth_terminal
+
 import android.app.Application
 import android.content.Context
 import android.widget.TextView
 import com.clj.fastble.BleManager
-import com.clj.fastble.callback.BleWriteCallback
 import com.clj.fastble.data.BleDevice
 import com.clj.fastble.exception.BleException
+import com.clj.fastble.callback.BleWriteCallback
 import com.clj.fastble.scan.BleScanRuleConfig
 
 object OtaUpdateManager {
@@ -13,9 +15,7 @@ object OtaUpdateManager {
     var uuid_notify: String? = "0000ffe1-0000-1000-8000-00805f9b34fb"
 
     fun init(context: Context) {
-        // 使用 ApplicationContext 代替传入的 context 以防止内存泄漏
-        val appContext = context.applicationContext
-        BleManager.getInstance().init(appContext as Application)
+        BleManager.getInstance().init(context.applicationContext as Application)
         BleManager.getInstance()
             .enableLog(true)
             .setReConnectCount(1, 5000)
@@ -43,8 +43,8 @@ object OtaUpdateManager {
     private fun sendOtaCommand(bleDevice: BleDevice, command: ByteArray, receiveText: TextView) {
         BleManager.getInstance().write(
             bleDevice,
-            uuid_service, // UUID for Service
-            uuid_notify, // UUID for Characteristic
+            uuid_service,
+            uuid_notify,
             command,
             object : BleWriteCallback() {
                 override fun onWriteSuccess(current: Int, total: Int, justWrite: ByteArray?) {

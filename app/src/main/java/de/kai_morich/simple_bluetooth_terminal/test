@@ -1,18 +1,2 @@
-TARTING FACTORY FIMRWARE v(0.7).
-PUDCAM TEST.
-TX: AT+BAUD4
-RX:
-TX: AT+ROLE0
-RX:
-TX: AT+NAMEPUDCAM
-RX:
-Testing flash_store_data module.
-checking if the location has been wiped.
-configuring camera for JPEG capture.
-Received command: 0x55 0xFF 0xAA
-Received command: 0x55 0x01 0x19 0xAA
-Received command: 0x55 0x01 0x11 0xAA
-Entering main loop.
-estimated_soc: 0.15
 Received command: 0x55 0x36
 Rebooting from another

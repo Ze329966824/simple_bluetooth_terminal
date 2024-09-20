@@ -7,11 +7,17 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.FragmentManager
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.annotation.RequiresApi
 
 class MainActivity : AppCompatActivity(), FragmentManager.OnBackStackChangedListener {
+
+
+     lateinit var bleOtaManager: BleOtaManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -53,7 +59,13 @@ class MainActivity : AppCompatActivity(), FragmentManager.OnBackStackChangedList
         if (!hasPermissions(locationPermission)) {
             requestPermissions(locationPermission, 1)
         } else {
-            OtaUpdateManager.init(this@MainActivity)
+
+            // 初始化 BLE 管理器
+            bleOtaManager = BleOtaManager(this)
+
+
+
+//            OtaUpdateManager.init(this@MainActivity)
         }
     }
 
@@ -78,13 +90,16 @@ class MainActivity : AppCompatActivity(), FragmentManager.OnBackStackChangedList
     }
 
 
+
+
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<out String>, grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1) {
             if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                OtaUpdateManager.init(this@MainActivity)
+//                OtaUpdateManager.init(this@MainActivity)
+                bleOtaManager = BleOtaManager(this)
 
             } else {
                 Log.e(OtaUpdateManager.TAG, "Permission denied!")

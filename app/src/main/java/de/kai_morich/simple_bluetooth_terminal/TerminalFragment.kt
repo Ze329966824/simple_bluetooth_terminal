@@ -1,6 +1,8 @@
 package de.kai_morich.simple_bluetooth_terminal
 
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.graphics.Color
 import android.os.Build
@@ -36,13 +38,28 @@ class TerminalFragment : Fragment() {
     private var bleDevice: BleDevice? = null
     private var step = 0
 
+
+
+
+    var bluetoothDevice: BluetoothDevice? = null
+
+
     override fun onResume() {
         super.onResume()
         // 从上一个Fragment获取传递过来的设备地址
         val deviceAddress = arguments?.getString("device_address")
 
+        // 在你的代码中获取到 BluetoothDevice
+        val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+        bluetoothDevice = bluetoothAdapter?.getRemoteDevice(deviceAddress)
+
         // 连接设备
-        connectDevice(deviceAddress)
+        bluetoothDevice?.let {
+            (activity as MainActivity).bleOtaManager.connect(it)
+        }
+
+        // 连接设备
+//        connectDevice(deviceAddress)
     }
 
     override fun onCreateView(
@@ -56,7 +73,9 @@ class TerminalFragment : Fragment() {
 
         // 设置OTA按钮的点击事件
         otaBtn.setOnClickListener {
-            startOtaProcess() // 点击按钮触发OTA流程
+//            startOtaProcess() // 点击按钮触发OTA流程
+            (activity as MainActivity).bleOtaManager.startOtaProcess()
+
         }
 
         return view

@@ -32,6 +32,9 @@ class DevicesFragment : Fragment() {
         listAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, ArrayList<String>())
         listView.adapter = listAdapter
 
+
+
+
         refreshButton.setOnClickListener {
             startScan()
         }

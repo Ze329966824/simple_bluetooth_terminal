@@ -51,6 +51,7 @@ object OtaUpdateManager {
             uuid_service,
             uuid_notify,
             command,
+            true,
             object : BleWriteCallback() {
                 override fun onWriteSuccess(current: Int, total: Int, justWrite: ByteArray?) {
                     val commandText = justWrite?.joinToString(" ") { String.format("%02X", it) } ?: ""

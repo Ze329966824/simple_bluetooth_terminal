@@ -102,7 +102,7 @@ class TerminalFragment : Fragment() {
 
     private fun setMaxMTU() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val maxMTU = 512  // 直接尝试设置为最大值 512
+            val maxMTU = 50  // 直接尝试设置为最大值 512
 
             BleManager.getInstance()
                 .setMtu(bleDevice, maxMTU, object : BleMtuChangedCallback() {
@@ -286,22 +286,26 @@ class TerminalFragment : Fragment() {
             }
 
             3 -> {
+
                 // Step 3: 发送自定义 OTA 数据包
                 val otaDataCommand = byteArrayOf(
                     0xAA.toByte(),   // SOF
-                    0x01.toByte(),   // Packet type
-                    0x05.toByte(),   // Data length (低字节)
+                    0x01.toByte(),   // Packet type (数据类型)
+                    0x05.toByte(),   // Data length (低字节, 表示5个字节的内容)
                     0x00.toByte(),   // Data length (高字节)
                     0x68.toByte(),   // 'h'
                     0x65.toByte(),   // 'e'
                     0x6C.toByte(),   // 'l'
                     0x6C.toByte(),   // 'l'
                     0x6F.toByte(),   // 'o'
-                    0x00.toByte(),   // Padding
-                    0x00.toByte(),   // Padding
-                    0x00.toByte(),   // Padding
-                    0x00.toByte(),   // Padding
-                    0xBB.toByte()    // End byte
+
+                    // CRC 校验 (假设为0)
+                    0x00.toByte(),   // CRC
+                    0x00.toByte(),   // CRC
+                    0x00.toByte(),   // CRC
+                    0x00.toByte(),   // CRC
+
+                    0xBB.toByte()    // EOF (结束标志)
                 )
 
                 sendOtaCommand(bleDevice, otaDataCommand, receiveText)

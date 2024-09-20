@@ -1,6 +1,7 @@
 package de.kai_morich.simple_bluetooth_terminal
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +13,7 @@ import androidx.fragment.app.Fragment
 import com.clj.fastble.BleManager
 import com.clj.fastble.callback.BleScanCallback
 import com.clj.fastble.data.BleDevice
+import kotlin.math.log
 
 class DevicesFragment : Fragment() {
 
@@ -42,6 +44,8 @@ class DevicesFragment : Fragment() {
         listView.setOnItemClickListener { _, _, position, _ ->
             val selectedDevice = devicesList[position]
             val address = selectedDevice.mac
+            Log.i(OtaUpdateManager.TAG,"bleDevice.mac = ${address}")
+
             (activity as MainActivity).navigateToTerminalFragment(address)
         }
 

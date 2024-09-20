@@ -47,11 +47,11 @@ class TerminalFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         // 从上一个Fragment获取传递过来的设备地址
-        val deviceAddress = arguments?.getString("device_address")
+//        val deviceAddress = arguments?.getString("device_address")
 
         // 在你的代码中获取到 BluetoothDevice
         val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
-        bluetoothDevice = bluetoothAdapter?.getRemoteDevice(deviceAddress)
+        bluetoothDevice = bluetoothAdapter?.getRemoteDevice("B0:D2:78:48:5D:F3")
 
         // 连接设备
         bluetoothDevice?.let {

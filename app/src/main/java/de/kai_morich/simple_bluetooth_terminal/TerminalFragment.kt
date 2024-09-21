@@ -47,19 +47,19 @@ class TerminalFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         // 从上一个Fragment获取传递过来的设备地址
-//        val deviceAddress = arguments?.getString("device_address")
+        val deviceAddress = arguments?.getString("device_address")
 
         // 在你的代码中获取到 BluetoothDevice
-        val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
-        bluetoothDevice = bluetoothAdapter?.getRemoteDevice("B0:D2:78:48:5D:F3")
+//        val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+//        bluetoothDevice = bluetoothAdapter?.getRemoteDevice("B0:D2:78:48:5D:F3")
 
         // 连接设备
-        bluetoothDevice?.let {
-            (activity as MainActivity).bleOtaManager.connect(it)
-        }
+//        bluetoothDevice?.let {
+//            (activity as MainActivity).bleOtaManager.connect(it)
+//        }
 
         // 连接设备
-//        connectDevice(deviceAddress)
+        connectDevice(deviceAddress)
     }
 
     override fun onCreateView(
@@ -73,8 +73,8 @@ class TerminalFragment : Fragment() {
 
         // 设置OTA按钮的点击事件
         otaBtn.setOnClickListener {
-//            startOtaProcess() // 点击按钮触发OTA流程
-            (activity as MainActivity).bleOtaManager.startOtaProcess()
+            startOtaProcess() // 点击按钮触发OTA流程
+//            (activity as MainActivity).bleOtaManager.startOtaProcess()
 
         }
 

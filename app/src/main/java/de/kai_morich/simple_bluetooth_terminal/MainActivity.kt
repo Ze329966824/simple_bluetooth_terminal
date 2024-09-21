@@ -61,11 +61,11 @@ class MainActivity : AppCompatActivity(), FragmentManager.OnBackStackChangedList
         } else {
 
             // 初始化 BLE 管理器
-            bleOtaManager = BleOtaManager(this)
+//            bleOtaManager = BleOtaManager(this)
 
 
 
-//            OtaUpdateManager.init(this@MainActivity)
+            OtaUpdateManager.init(this@MainActivity)
         }
     }
 
@@ -98,8 +98,8 @@ class MainActivity : AppCompatActivity(), FragmentManager.OnBackStackChangedList
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1) {
             if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-//                OtaUpdateManager.init(this@MainActivity)
-                bleOtaManager = BleOtaManager(this)
+                OtaUpdateManager.init(this@MainActivity)
+//                bleOtaManager = BleOtaManager(this)
 
             } else {
                 Log.e(OtaUpdateManager.TAG, "Permission denied!")

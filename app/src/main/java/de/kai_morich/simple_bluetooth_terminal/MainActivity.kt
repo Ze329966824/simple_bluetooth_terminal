@@ -25,7 +25,7 @@ class MainActivity : AppCompatActivity(), FragmentManager.OnBackStackChangedList
         setSupportActionBar(toolbar)
         supportFragmentManager.addOnBackStackChangedListener(this)
         if (savedInstanceState == null) supportFragmentManager.beginTransaction()
-            .add(R.id.fragment_container, TerminalFragment(), "devices").commit()
+            .add(R.id.fragment_container, DevicesFragment(), "devices").commit()
         else onBackStackChanged()
 
         checkPer()

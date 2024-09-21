@@ -298,6 +298,7 @@ class TerminalFragment : Fragment() {
                     0x00.toByte(),
                     0x00.toByte(),
                     0x00.toByte(),
+                    0x00.toByte(),
                     0xBB.toByte()
                 )
                 sendOtaCommand(bleDevice, otaHeaderCommand, receiveText)
